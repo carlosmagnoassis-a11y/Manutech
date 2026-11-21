@@ -7,7 +7,6 @@ data class Manutencao(
     val problema: String,
     val data: String,
     val descricao: String,
-    var status: String = "Aberta"
+    var status: String = "Aberta",
+    val id_equipamento: Int = 0
 )
-
-

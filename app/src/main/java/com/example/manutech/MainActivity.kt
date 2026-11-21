@@ -5,33 +5,24 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.manutech.api.RetrofitClient
+import com.example.manutech.model.Manutencao
 
 private val AzulManutech = Color(0xFF164A8A)
 private val Fundo = Color(0xFFF3F6FA)
@@ -55,6 +46,62 @@ fun TelaInicial(
     onNovaManutencaoClick: () -> Unit = {},
     onHistoricoClick: () -> Unit = {}
 ) {
+    var manutencoes by remember {
+        mutableStateOf<List<Manutencao>>(emptyList())
+    }
+
+    var carregando by remember { mutableStateOf(true) }
+    var erro by remember { mutableStateOf("") }
+    var atualizar by remember { mutableIntStateOf(0) }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                atualizar++
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(atualizar) {
+        carregando = true
+        erro = ""
+
+        try {
+            val resposta =
+                RetrofitClient.apiService.listarManutencoes()
+
+            if (resposta.isSuccessful) {
+                manutencoes = resposta.body().orEmpty()
+            } else {
+                erro = "Não foi possível carregar os dados."
+            }
+        } catch (e: Exception) {
+            erro = "Falha na conexão com o servidor."
+        } finally {
+            carregando = false
+        }
+    }
+
+    val abertas = manutencoes.count {
+        it.status == "Aberta"
+    }
+
+    val andamento = manutencoes.count {
+        it.status == "Em andamento"
+    }
+
+    val concluidas = manutencoes.count {
+        it.status == "Concluída"
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Fundo
@@ -63,48 +110,87 @@ fun TelaInicial(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp)
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Cabeçalho
-            Text(
-                text = "MANUTECH",
-                fontSize = 27.sp,
-                fontWeight = FontWeight.Bold,
-                color = AzulManutech
-            )
 
-            Text(
-                text = "Controle de Manutenção",
-                fontSize = 15.sp,
-                color = Color.Gray
-            )
+            // CABEÇALHO
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = AzulManutech
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(22.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "⚙  MANUTECH",
+                        color = Color.White,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Bold
+                    )
 
-            Text(
-                text = "Olá, seja bem-vindo!",
-                fontSize = 23.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextoEscuro
-            )
+                    Text(
+                        text = "Controle de Manutenção",
+                        color = Color(0xFFDDEAF8),
+                        fontSize = 14.sp
+                    )
 
-            Text(
-                text = "Acompanhe suas manutenções.",
-                fontSize = 15.sp,
-                color = Color.DarkGray
-            )
+                    Spacer(Modifier.height(12.dp))
 
-            Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Olá, seja bem-vindo!",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
 
-            // Resumo das manutenções
-            Text(
-                text = "Resumo das manutenções",
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextoEscuro
-            )
+                    Text(
+                        text = "Gerencie equipamentos e acompanhe seus serviços.",
+                        color = Color(0xFFE5EDF7),
+                        fontSize = 14.sp
+                    )
+                }
+            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            // RESUMO
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Resumo das manutenções",
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextoEscuro,
+                    modifier = Modifier.weight(1f)
+                )
+
+                TextButton(
+                    onClick = { atualizar++ },
+                    enabled = !carregando
+                ) {
+                    Text("Atualizar")
+                }
+            }
+
+            if (carregando) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (erro.isNotEmpty()) {
+                Text(
+                    text = erro,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -112,27 +198,39 @@ fun TelaInicial(
             ) {
                 CartaoStatus(
                     titulo = "Abertas",
-                    quantidade = "05",
-                    cor = Color(0xFFE59A19),
+                    quantidade = if (carregando || erro.isNotEmpty()) {
+                        "—"
+                    } else {
+                        abertas.toString()
+                    },
+                    cor = Color(0xFFB7791F),
                     modifier = Modifier.weight(1f)
                 )
 
                 CartaoStatus(
                     titulo = "Em andamento",
-                    quantidade = "03",
+                    quantidade = if (carregando || erro.isNotEmpty()) {
+                        "—"
+                    } else {
+                        andamento.toString()
+                    },
                     cor = Color(0xFF2878D0),
                     modifier = Modifier.weight(1f)
                 )
 
                 CartaoStatus(
                     titulo = "Concluídas",
-                    quantidade = "12",
+                    quantidade = if (carregando || erro.isNotEmpty()) {
+                        "—"
+                    } else {
+                        concluidas.toString()
+                    },
                     cor = Color(0xFF238653),
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            // ACESSO RÁPIDO
 
             Text(
                 text = "Acesso rápido",
@@ -141,27 +239,28 @@ fun TelaInicial(
                 color = TextoEscuro
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
             BotaoMenu(
                 texto = "Consultar equipamentos",
                 descricao = "Visualizar equipamentos cadastrados",
+                icone = "▣",
                 onClick = onEquipamentosClick
             )
 
             BotaoMenu(
                 texto = "Nova manutenção",
                 descricao = "Registrar um problema ou serviço",
+                icone = "+",
                 onClick = onNovaManutencaoClick
             )
 
             BotaoMenu(
                 texto = "Histórico de manutenções",
-                descricao = "Consultar serviços anteriores",
+                descricao = "Consultar serviços registrados",
+                icone = "☷",
                 onClick = onHistoricoClick
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
+            // MANUTENÇÕES RECENTES
 
             Text(
                 text = "Manutenções recentes",
@@ -170,23 +269,31 @@ fun TelaInicial(
                 color = TextoEscuro
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            CartaoManutencao(
-                equipamento = "Servidor de Rede",
-                problema = "Verificar conectividade",
-                status = "Em andamento",
-                corStatus = Color(0xFF2878D0)
-            )
-
-            CartaoManutencao(
-                equipamento = "Switch de Rede",
-                problema = "Falha em uma porta",
-                status = "Aberta",
-                corStatus = Color(0xFFE59A19)
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
+            if (!carregando && erro.isEmpty()) {
+                if (manutencoes.isEmpty()) {
+                    Text(
+                        text = "Nenhuma manutenção cadastrada.",
+                        color = Color.Gray
+                    )
+                } else {
+                    manutencoes
+                        .sortedByDescending { it.id }
+                        .take(3)
+                        .forEach { manutencao ->
+                            CartaoManutencao(
+                                equipamento = manutencao.equipamento,
+                                problema = manutencao.problema,
+                                status = manutencao.status,
+                                corStatus = when (manutencao.status) {
+                                    "Aberta" -> Color(0xFFB7791F)
+                                    "Em andamento" -> Color(0xFF2878D0)
+                                    "Concluída" -> Color(0xFF238653)
+                                    else -> Color.DarkGray
+                                }
+                            )
+                        }
+                }
+            }
 
             Text(
                 text = "Manutech • Controle de Manutenção",
@@ -207,7 +314,7 @@ fun CartaoStatus(
 ) {
     Card(
         modifier = modifier.height(112.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.White
         ),
@@ -218,21 +325,22 @@ fun CartaoStatus(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(10.dp),
+                .padding(12.dp),
             verticalArrangement = Arrangement.Center
         ) {
             Text(
                 text = quantidade,
-                fontSize = 25.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 color = cor
             )
 
-            Spacer(modifier = Modifier.height(5.dp))
+            Spacer(Modifier.height(6.dp))
 
             Text(
                 text = titulo,
                 fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
                 color = TextoEscuro
             )
         }
@@ -243,14 +351,14 @@ fun CartaoStatus(
 fun BotaoMenu(
     texto: String,
     descricao: String,
+    icone: String,
     onClick: () -> Unit
 ) {
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 10.dp),
-        shape = RoundedCornerShape(12.dp),
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.White
         ),
@@ -259,22 +367,34 @@ fun BotaoMenu(
         )
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(
-                modifier = Modifier.weight(1f)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        Color(0xFFEAF1F9),
+                        RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
             ) {
+                Text(
+                    text = icone,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AzulManutech
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = texto,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextoEscuro
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
                     text = descricao,
@@ -283,19 +403,11 @@ fun BotaoMenu(
                 )
             }
 
-            Spacer(modifier = Modifier.width(4.dp))
-
-            Button(
-                onClick = onClick,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AzulManutech
-                )
-            ) {
-                Text(
-                    text = "Abrir",
-                    fontSize = 12.sp
-                )
-            }
+            Text(
+                text = "›",
+                fontSize = 28.sp,
+                color = AzulManutech
+            )
         }
     }
 }
@@ -308,16 +420,18 @@ fun CartaoManutencao(
     corStatus: Color
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 10.dp),
-        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Text(
                 text = equipamento,
@@ -326,20 +440,16 @@ fun CartaoManutencao(
                 color = TextoEscuro
             )
 
-            Spacer(modifier = Modifier.height(5.dp))
-
             Text(
                 text = problema,
                 fontSize = 14.sp,
                 color = Color.DarkGray
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
             Text(
-                text = "Status: $status",
+                text = "●  $status",
                 fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 color = corStatus
             )
         }

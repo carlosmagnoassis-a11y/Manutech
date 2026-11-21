@@ -13,3 +13,16 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Arquivos gerados pelo Android
+/app/build/
+/app/.cxx/
+
+# Credenciais do banco de dados
+/backend/conexao.php
+/backend/.env
+
+# Arquivos temporarios
+*.log
+*.tmp
+Thumbs.db
